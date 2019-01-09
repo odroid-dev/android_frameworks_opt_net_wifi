@@ -22,7 +22,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <dirent.h>
-#include <log/log.h>
 
 #include <android-base/logging.h>
 #include <cutils/misc.h>
