@@ -48,9 +48,6 @@ extern "C" int delete_module(const char *, unsigned int);
 
 static const char DRIVER_PROP_NAME[] = "wlan.driver.status";
 #ifdef WIFI_DRIVER_MODULE_PATH
-static const char DRIVER_MODULE_NAME[] = WIFI_DRIVER_MODULE_NAME;
-static const char DRIVER_MODULE_TAG[] = WIFI_DRIVER_MODULE_NAME " ";
-//static const char DRIVER_MODULE_PATH[] = WIFI_DRIVER_MODULE_PATH;
 static const char DRIVER_MODULE_ARG[] = WIFI_DRIVER_MODULE_ARG;
 static const char MODULE_FILE[] = "/proc/modules";
 #endif
@@ -114,11 +111,21 @@ int wifi_change_driver_state(const char *state) {
 }
 #endif
 
+static struct wifi_modules {
+  int vid;
+  int pid;
+  char tag[32];
+  char modules[16][PATH_MAX];
+  int nr_modules;
+} wifi_modules = {
+  .nr_modules = 0,
+};
+
 int is_wifi_driver_loaded() {
   char driver_status[PROPERTY_VALUE_MAX];
 #ifdef WIFI_DRIVER_MODULE_PATH
   FILE *proc;
-  char line[sizeof(DRIVER_MODULE_TAG) + 10];
+  char line[32];
 #endif
 
   if (!property_get(DRIVER_PROP_NAME, driver_status, NULL) ||
@@ -138,7 +145,7 @@ int is_wifi_driver_loaded() {
     return 0;
   }
   while ((fgets(line, sizeof(line), proc)) != NULL) {
-    if (strncmp(line, DRIVER_MODULE_TAG, strlen(DRIVER_MODULE_TAG)) == 0) {
+    if (strncmp(line, wifi_modules.tag, strlen(wifi_modules.tag)) == 0) {
       fclose(proc);
       return 1;
     }
@@ -150,16 +157,6 @@ int is_wifi_driver_loaded() {
   return 1;
 #endif
 }
-
-static struct wifi_modules {
-  int vid;
-  int pid;
-  char tag[32];
-  char modules[16][PATH_MAX];
-  int nr_modules;
-} wifi_modules = {
-  .nr_modules = 0,
-};
 
 struct wifi_usbdev *gWifiUSBdev;
 
@@ -233,7 +230,8 @@ int load_wifi_list(struct wifi_modules* drv)
     while (fgets(line, sizeof(line), fp)) {
         sscanf(line, "%04x %04x %s %s", &vid, &pid, tag, probe);
         if ((drv->vid == vid) && (drv->pid == pid)) {
-            ALOGI("USB WiFi device is detected, [%04x:%04x]", drv->vid, drv->pid);
+            LOG(INFO) << "USB WiFi device is detected, [" 
+                << std::hex << drv->vid << ":" << std::hex << drv->pid << "]";
             found = 1;
             break;
         }
@@ -304,7 +302,7 @@ int wifi_load_driver() {
 
   for (i = 0; i < wifi_modules.nr_modules; i++) {
     char *drv = wifi_modules.modules[i];
-    PLOG(INFO) << "Loading " << drv;
+    LOG(INFO) << "Loading " << drv;
     if (insmod(drv, DRIVER_MODULE_ARG) < 0)
       return -1;
     usleep(200000);
@@ -332,30 +330,24 @@ int wifi_unload_driver() {
   while (wifi_modules.nr_modules > 0) {
     wifi_modules.nr_modules--;
     path2tag(wifi_modules.modules[wifi_modules.nr_modules], drvname);
-    if (rmmod(DRIVER_MODULE_NAME) == 0) {
+    if (rmmod(drvname) == 0) {
       int count = 20; /* wait at most 10 seconds for completion */
       while (count-- > 0) {
         if (!is_wifi_driver_loaded()) break;
         usleep(500000);
       }
       usleep(500000); /* allow card removal */
-      if (count) {
-        return 0;
-      }
-      return -1;
-    } else
-      return -1;
+    }
   }
-  return -1;
 #else
 #ifdef WIFI_DRIVER_STATE_CTRL_PARAM
   if (is_wifi_driver_loaded()) {
     if (wifi_change_driver_state(WIFI_DRIVER_STATE_OFF) < 0) return -1;
   }
 #endif
+#endif
   property_set(DRIVER_PROP_NAME, "unloaded");
   return 0;
-#endif
 }
 
 const char *wifi_get_fw_path(int fw_type) {
