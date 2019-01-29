@@ -46,6 +46,7 @@ extern "C" int delete_module(const char *, unsigned int);
 #endif
 
 static const char DRIVER_PROP_NAME[] = "wlan.driver.status";
+static const char DRIVER_PROP_TAG[] = "wlan.driver.tag";
 #ifdef WIFI_DRIVER_MODULE_PATH
 static const char DRIVER_MODULE_ARG[] = WIFI_DRIVER_MODULE_ARG;
 static const char MODULE_FILE[] = "/proc/modules";
@@ -306,6 +307,7 @@ int wifi_load_driver() {
       return -1;
     usleep(200000);
   }
+  property_set(DRIVER_PROP_TAG, wifi_modules.tag);
 #endif
 
 #ifdef WIFI_DRIVER_STATE_CTRL_PARAM
@@ -338,6 +340,7 @@ int wifi_unload_driver() {
       usleep(500000); /* allow card removal */
     }
   }
+  property_set(DRIVER_PROP_TAG, "");
 #else
 #ifdef WIFI_DRIVER_STATE_CTRL_PARAM
   if (is_wifi_driver_loaded()) {
