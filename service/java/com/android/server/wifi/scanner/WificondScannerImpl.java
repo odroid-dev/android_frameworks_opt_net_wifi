@@ -377,7 +377,9 @@ public class WificondScannerImpl extends WifiScannerImpl implements Handler.Call
                         singleScanResults.add(result);
                     }
                 } else {
-                    numFilteredScanResults++;
+                    // ODROID add result anyway.
+                    singleScanResults.add(result);
+                    //numFilteredScanResults++;
                 }
             }
             if (numFilteredScanResults != 0) {
